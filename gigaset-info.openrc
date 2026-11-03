@@ -1,0 +1,28 @@
+#!/sbin/openrc-run
+
+name="Gigaset Info Services"
+description="Gigaset C610A-IP Weather Server"
+
+supervisor="supervise-daemon"
+
+directory="/opt/gigaset"
+runtime_dir="/run/gigaset"
+command="/opt/gigaset/venv/bin/gunicorn"
+command_args="--bind ${BIND:-0.0.0.0}:80 --workers 1 --control-socket ${runtime_dir}/gunicorn.ctl --access-logfile - --error-logfile - app:app"
+
+command_user="root"
+
+output_log="/var/log/gigaset.log"
+error_log="/var/log/gigaset.log"
+
+respawn_delay=5
+respawn_max=0
+
+depend() {
+    need net
+}
+
+start_pre() {
+    checkpath -d -m 0750 "${runtime_dir}"
+    checkpath -f -m 0644 /var/log/gigaset.log
+}
