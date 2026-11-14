@@ -4,14 +4,15 @@
 import logging
 import os
 import time
-from datetime import datetime, timedelta
 from html import escape
 from threading import Lock
 from zoneinfo import ZoneInfo
 
 import requests
 from dotenv import load_dotenv
-from flask import Flask, Response
+
+from flask import Flask, Response, request
+from datetime import datetime, timedelta, timezone
 
 load_dotenv()
 
@@ -22,10 +23,7 @@ API_URL = "https://api.open-meteo.com/v1/forecast"
 
 LAT = float(os.environ["LAT"])
 LON = float(os.environ["LON"])
-TZ_NAME = os.environ["TZ"]
-TZ = ZoneInfo(TZ_NAME)
-
-CACHE_TTL = 1800
+CACHE_TTL = int(os.getenv("CACHE_TTL", 1800))
 
 PARAMS = {
     "latitude": LAT,
@@ -39,7 +37,6 @@ PARAMS = {
         "weather_code",
     ]),
     "wind_speed_unit": "ms",
-    "timezone": TZ_NAME,
 }
 
 WEATHER_CODES = {
@@ -72,7 +69,6 @@ WEATHER_CODES = {
 cache = {
     "data": None,
     "updated": 0,
-    "fetched_at": None,
 }
 
 cache_lock = Lock()
@@ -84,7 +80,7 @@ def get_weather():
 
         if cache["data"] is not None:
             if now - cache["updated"] < CACHE_TTL:
-                return cache["data"], False, cache["fetched_at"]
+                return cache["data"], False
 
         try:
             response = requests.get(
@@ -97,13 +93,12 @@ def get_weather():
 
             cache["data"] = data
             cache["updated"] = time.monotonic()
-            cache["fetched_at"] = datetime.now(TZ)
 
-            return data, False, cache["fetched_at"]
+            return data, False
 
         except (requests.RequestException, ValueError, KeyError):
             app.logger.exception("Weather API error")
-            return cache["data"], True, cache["fetched_at"]
+            return cache["data"], True
 
 
 def fmt(value, suffix="", decimals=0):
@@ -117,9 +112,12 @@ def paragraph(text, style=""):
 
 
 def render_weather():
-    data, stale, fetched_at = get_weather()
+    data, stale = get_weather()
 
-    now = datetime.now(TZ)
+    tz_minutes = request.args.get("tz", default=180, type=int)
+    tz = timezone(timedelta(minutes=tz_minutes))
+    now = datetime.now(tz)
+
     datestr = now.strftime("%A, %d %b")
 
     next_midnight = (now + timedelta(days=1)).replace(
@@ -133,7 +131,7 @@ def render_weather():
         1,
         min(
             CACHE_TTL,
-            int((next_midnight - now).total_seconds()) + 1,
+            int((next_midnight - now).total_seconds()) + 3,
         ),
     )
 
