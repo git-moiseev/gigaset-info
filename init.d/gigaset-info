@@ -8,21 +8,22 @@ supervisor="supervise-daemon"
 directory="/opt/gigaset"
 runtime_dir="/run/gigaset"
 command="/opt/gigaset/venv/bin/gunicorn"
-command_args="--bind ${BIND:-0.0.0.0}:80 --workers 1 --control-socket ${runtime_dir}/gunicorn.ctl --access-logfile - --error-logfile - app:app"
+command_args="--bind ${BIND:-0.0.0.0}:${PORT:-80} --workers 1 --control-socket ${runtime_dir}/gunicorn.ctl ${DEBUG_ACCESS} --error-logfile - app:app"
 
 command_user="root"
 
-output_log="/var/log/gigaset.log"
-error_log="/var/log/gigaset.log"
+# Forward stdout/stderr to syslog
+output_logger="logger -t gigaset-info"
+error_logger="logger -t gigaset-info"
 
 respawn_delay=5
 respawn_max=0
 
 depend() {
     need net
+    use logger
 }
 
 start_pre() {
     checkpath -d -m 0750 "${runtime_dir}"
-    checkpath -f -m 0644 /var/log/gigaset.log
 }

@@ -114,26 +114,10 @@ def paragraph(text, style=""):
 def render_weather():
     data, stale = get_weather()
 
-    tz_minutes = request.args.get("tz", default=180, type=int)
+    tz_minutes = request.args.get("tz", default=0, type=int)
     tz = timezone(timedelta(minutes=tz_minutes))
     now = datetime.now(tz)
-
     datestr = now.strftime("%A, %d %b")
-
-    next_midnight = (now + timedelta(days=1)).replace(
-        hour=0,
-        minute=0,
-        second=0,
-        microsecond=0,
-    )
-
-    html_ttl = max(
-        1,
-        min(
-            CACHE_TTL,
-            int((next_midnight - now).total_seconds()) + 3,
-        ),
-    )
 
     body = []
 
@@ -189,7 +173,7 @@ def render_weather():
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <title>{datestr}</title>
-<meta name="expires" content="{html_ttl}" />
+<meta name="expires" content="60" />
 </head>
 <body>
 {content}
@@ -214,4 +198,3 @@ def health():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80, debug=False)
-
